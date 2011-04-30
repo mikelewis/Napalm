@@ -2,18 +2,20 @@ require 'set'
 module Napalm
   module JobServer
     @@workers = Set.new
+    @@worker_methods = {}
 
     def post_init
       @buffer = ""
-      @port, *ip_parts = get_peername[2,6].unpack "nC4"
-      @ip = ip_parts.join('.')
-
+      @log = []
+      port, *ip_parts = get_peername[2,6].unpack "nC4"
+      ip = ip_parts.join('.')
+      @connection = {:ip => ip, :port=>port, :busy => false}
 
       @commands = {
         :add_worker => 
         {
-          :regex => /^ADD_WORKER$/,
-          :route => proc { add_worker }
+          :regex => /^ADD_WORKER\s(.+)$/,
+          :route => proc {|x| add_worker(*x.split(" ")) }
         },
         :get_workers => {
           :regex => /^GET_WORKERS$/,
@@ -22,7 +24,9 @@ module Napalm
         :do_work =>
         {
           :regex => /^DO_WORK\s(.+)$/,
-          :route => proc {|w| do_work(w)}
+          :route => proc {|w|
+                      do_work(*w.split(" "))
+                    }
         }
       }
 
@@ -36,7 +40,11 @@ module Napalm
 
     def unbind
       #remove worker
-      @@workers.delete(:ip=>@ip, :port=>@port)
+      if @@workers.delete?(@connection)
+        @@worker_methods.each do |meth, workers|
+          workers.delete(@connection)
+        end
+      end
     end
 
     private
@@ -47,15 +55,23 @@ module Napalm
       end
     end
 
-    def add_worker
-      @@workers << {:ip=>@ip, :port=>@port}
-      @buffer << "Added #{@ip}:#{@port} to worker list"
+    def add_worker(*methods)
+      @@workers << @connection
+      methods.each{|m| (@@worker_methods[m.to_sym] ||= Set.new) << @connection  }
+      @buffer << "Added #{@connection[:ip]}:#{@connection[:port]} (#{methods.join(",")}) to worker list"
+      p @@worker_methods
     end
 
     def get_workers
       @buffer << @@workers.to_a.inspect
     end
 
+    def do_work(payload)
+      meth = payload.shift
+      args = payload
+      worker = @@worker_methods[meth.to_sym].find{|worker| !worker[:busy]}
+
+    end
 
     def execute_command(cmd)
       if command_desc = @commands.find{|c,v| v[:regex].match(cmd)}.to_a[1]

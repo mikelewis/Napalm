@@ -8,4 +8,5 @@ end
 require 'napalm/queue'
 require 'napalm/job_server'
 require 'napalm/worker'
+require 'napalm/client'
 require 'napalm/runner'
