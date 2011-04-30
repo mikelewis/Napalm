@@ -3,13 +3,14 @@ module Napalm
   module JobServer
     @@workers = Set.new
     @@worker_methods = {}
+    @@log = []
 
     def post_init
       @buffer = ""
-      @log = []
-      port, *ip_parts = get_peername[2,6].unpack "nC4"
-      ip = ip_parts.join('.')
-      @connection = {:ip => ip, :port=>port, :busy => false}
+      @port, *ip_parts = get_peername[2,6].unpack "nC4"
+      @ip = ip_parts.join('.')
+      @busy = false
+      #@connection = {:ip => ip, :port=>port, :busy => false}
 
       @commands = {
         :add_worker => 
@@ -27,7 +28,12 @@ module Napalm
           :route => proc {|w|
                       do_work(*w.split(" "))
                     }
-        }
+        },
+          :done_working =>
+          {
+            :regex => /^DONE_WORKING$/,
+            :route => proc { @busy=false }
+          }
       }
 
     end
@@ -40,11 +46,23 @@ module Napalm
 
     def unbind
       #remove worker
-      if @@workers.delete?(@connection)
+      if @@workers.delete?(self)
         @@worker_methods.each do |meth, workers|
-          workers.delete(@connection)
+          workers.delete(self)
         end
       end
+    end
+
+    def to_s
+      "#{@ip}:#{@port}"
+    end
+
+    def busy?
+      @busy
+    end
+
+    def busy=(val)
+      @busy = val
     end
 
     private
@@ -56,20 +74,31 @@ module Napalm
     end
 
     def add_worker(*methods)
-      @@workers << @connection
-      methods.each{|m| (@@worker_methods[m.to_sym] ||= Set.new) << @connection  }
-      @buffer << "Added #{@connection[:ip]}:#{@connection[:port]} (#{methods.join(",")}) to worker list"
+      @@workers << self
+      methods.each{|m| (@@worker_methods[m.to_sym] ||= Set.new) << self  }
+      @@log << "Added #{@ip}:#{@port} (#{methods.join(",")}) to worker list"
       p @@worker_methods
     end
 
     def get_workers
-      @buffer << @@workers.to_a.inspect
+      @buffer << @@worker_methods.inspect
     end
 
-    def do_work(payload)
-      meth = payload.shift
-      args = payload
-      worker = @@worker_methods[meth.to_sym].find{|worker| !worker[:busy]}
+    def do_work(*payload)
+      meth = payload.shift.to_sym
+      unless @@worker_methods.include?(meth) && !@@worker_methods[meth].empty?
+        @buffer << "No worker can compute this task"
+        return
+      end
+      worker = @@worker_methods[meth].find{|worker| !worker.busy?}
+      if worker
+        p "Found Worker #{worker}"
+        worker.busy = true
+        worker.send_data("Payload:#{Marshal.dump([meth, payload])}")
+      else
+        p "worker busy"
+        #add to queue
+      end
 
     end
 
