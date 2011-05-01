@@ -1,46 +1,51 @@
+require 'eventmachine'
 require 'set'
 module Napalm
   module JobServer
+   include EM::P::ObjectProtocol
     @@workers = Set.new
     @@worker_methods = {}
+    @@clients = Set.new
     @@log = []
-
+    
     def post_init
       @buffer = ""
       @port, *ip_parts = get_peername[2,6].unpack "nC4"
       @ip = ip_parts.join('.')
-      @busy = false
-      #@connection = {:ip => ip, :port=>port, :busy => false}
+      @is_client = false
+      @is_worker = false
 
       @commands = {
         :add_worker => 
         {
-          :regex => /^ADD_WORKER\s(.+)$/,
-          :route => proc {|x| add_worker(*x.split(" ")) }
+          :route => proc {|methods| add_worker(methods) if methods.is_a?(Array) }
         },
-        :get_workers => {
-          :regex => /^GET_WORKERS$/,
+          :get_workers => 
+        {
           :route => proc { get_workers }
         },
-        :do_work =>
+          :do_work =>
         {
-          :regex => /^DO_WORK\s(.+)$/,
-          :route => proc {|w|
-                      do_work(*w.split(" "))
-                    }
+          :route => proc {|job| do_work(job) }
         },
           :done_working =>
-          {
-            :regex => /^DONE_WORKING$/,
-            :route => proc { @busy=false }
-          }
+        {
+          :route => proc { |job| done_working(job) }
+        }
       }
-
     end
 
-    def receive_data(data)
-      execute_command(data.chomp)
+    #def receive_data(data)
+    #  execute_command(data.chomp)
+    #
+    #  flush_buffer
+    #end
 
+    def receive_object(payload)
+      unless payload.cmd && @commands.include?(payload.cmd)
+        @buffer << Napalm::Codes::BAD_SERVER_COMMAND and return
+      end
+      route = @commands[payload.cmd][:route].call(payload.data)
       flush_buffer
     end
 
@@ -51,63 +56,69 @@ module Napalm
           workers.delete(self)
         end
       end
+      @@clients.delete(self)
     end
 
     def to_s
       "#{@ip}:#{@port}"
     end
-
-    def busy?
-      @busy
-    end
-
-    def busy=(val)
-      @busy = val
-    end
-
+    
     private
+
+    def client?
+      @is_client
+    end
+
+    def worker?
+      @is_worker
+    end
+    #Universal Method
+    
     def flush_buffer
-      unless @buffer.empty?
+      if @buffer.empty?
+        send_data("OK") if client?
+      else
         send_data(@buffer)
         @buffer = ""
       end
     end
 
-    def add_worker(*methods)
+    #Worker Method
+    def add_worker(methods)
       @@workers << self
-      methods.each{|m| (@@worker_methods[m.to_sym] ||= Set.new) << self  }
+      @is_worker = true
+      methods.each{|m| (@@worker_methods[m] ||= Set.new) << self  }
       @@log << "Added #{@ip}:#{@port} (#{methods.join(",")}) to worker list"
-      p @@worker_methods
     end
 
+    #Universal Method
     def get_workers
       @buffer << @@worker_methods.inspect
     end
 
-    def do_work(*payload)
-      meth = payload.shift.to_sym
-      unless @@worker_methods.include?(meth) && !@@worker_methods[meth].empty?
-        @buffer << "No worker can compute this task"
-        return
-      end
-      worker = @@worker_methods[meth].find{|worker| !worker.busy?}
-      if worker
-        p "Found Worker #{worker}"
-        worker.busy = true
-        worker.send_data("Payload:#{Marshal.dump([meth, payload])}")
-      else
-        p "worker busy"
-        #add to queue
-      end
+    #Client Method
 
+    def do_work(job)
+      @is_client = true
+      unless @@worker_methods.include?(job.meth) && !@@worker_methods[job.meth].empty?
+        @buffer << Napalm::Errors::NO_AVAILABLE_WORKERS and return
+      end
+      worker = next_worker(job.meth)
+      Napalm::Persistance.add(job)
+      worker.send_object(job)
     end
 
-    def execute_command(cmd)
-      if command_desc = @commands.find{|c,v| v[:regex].match(cmd)}.to_a[1]
-        command_desc[:route].call(Regexp.last_match[1])
-      else
-        @buffer << "Bad Command"
-      end
+    #Client Method
+    def next_worker(meth)
+      #need to implement, currently random
+      workers_array = @@worker_methods[meth].to_a
+      rand_index = rand(workers_array.length)
+      workers_array[rand_index]
+    end
+
+    #Worker Method
+    def done_working(job)
+      Napalm::Persistance.remove(job)
     end
   end
 end

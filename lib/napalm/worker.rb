@@ -1,37 +1,63 @@
 require 'eventmachine'
+require 'socket'
+require 'thread'
+
 module Napalm
   class Worker < EventMachine::Connection
-    def initialize(methods)
-      #register worker with job server
-      send_data("ADD_WORKER #{methods.join(" ")}")
+   include EM::P::ObjectProtocol
+    @@job_queue = ::Queue.new
+
+    def initialize
+      super
+      send_object(Napalm::Payload.new(:add_worker, self.class.worker_meths))
     end
-    def receive_data(data)
-      return unless data.start_with?("Payload:")
-      data = Marshal.load(data.split("Payload:")[1])
-      meth, args = data
-      if respond_to?(meth)
-        if args.empty?
-          send(meth)
-        else
-          send(meth, *args)
+
+    def receive_object(obj)
+      @@job_queue << obj
+      do_job(obj)
+    end
+
+    private
+
+    def do_job(job)
+      EM.defer do
+        job = @@job_queue.pop
+        if respond_to?(job.meth)
+          begin
+            if job.args.empty?
+              send(job.meth)
+            else
+              send(job.meth, *job.args)
+            end
+          rescue ArgumentError
+            p "bad data"
+            #bad data
+          end
         end
+        completed_job(job)
       end
-      send_data("DONE_WORKING")
+    end
+
+    def completed_job(job)
+      send_object(Napalm::Payload.new(:done_working, job))
     end
 
     class << self
+      include Napalm::Utils
+      attr_reader :worker_meths, :my_ip, :my_port
       def worker_methods(*meths)
-        @methods = meths
+        @worker_meths = meths
       end
+
       def do_work(opts={})
-        raise "You need atleast one worker method" unless @methods
+        raise "You need atleast one worker method" unless @worker_meths
+        #job server settings
         opts.merge!({
           :ip => "127.0.0.1",
-          :port => 11211
+          :port => "11211"
         })
         EM.run {
-          #should checkout for timeout
-          EM.connect opts[:ip], opts[:port], self, @methods
+          srv = EM.connect opts[:ip], opts[:port], self
         }
       end
     end

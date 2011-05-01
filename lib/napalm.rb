@@ -1,11 +1,15 @@
 #ugly but needed
 $:.unshift(File.dirname(__FILE__))
 
+
 module Napalm
-  # Your code goes here...
 end
 
-require 'napalm/queue'
+require 'napalm/codes'
+require 'napalm/utils'
+require 'napalm/persistance'
+require 'napalm/payload'
+require 'napalm/job'
 require 'napalm/job_server'
 require 'napalm/worker'
 require 'napalm/client'
