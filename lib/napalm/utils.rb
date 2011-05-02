@@ -1,4 +1,3 @@
-require 'socket'
 module Napalm
   module Utils
     def rand_str(len)

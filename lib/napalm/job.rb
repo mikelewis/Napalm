@@ -1,4 +1,3 @@
-#require 'uuid'
 module Napalm
   class Job
     include Napalm::Utils
