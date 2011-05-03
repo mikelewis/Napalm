@@ -11,5 +11,18 @@ module Napalm
       @args = args
       @client = client
     end
+
+    def unmarshal_args!
+      begin
+        @args = Marshal.load(@args)
+      rescue ArgumentError => e
+        return Napalm::Codes::INVALID_WORKER_ARGUMENTS
+      end
+    end
+
+    def with_marshalled_args
+      @args = Marshal.dump(@args)
+      self
+    end
   end
 end

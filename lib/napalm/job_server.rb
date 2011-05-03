@@ -1,13 +1,14 @@
 require 'eventmachine'
 require 'set'
+
 module Napalm
   module JobServer
-   include EM::P::ObjectProtocol
+    include EM::P::ObjectProtocol
     @@workers = Set.new
     @@worker_methods = {}
     @@clients = Set.new
     @@log = []
-    
+
     def post_init
       @buffer = ""
       @port, *ip_parts = get_peername[2,6].unpack "nC4"
@@ -35,12 +36,6 @@ module Napalm
       }
     end
 
-    #def receive_data(data)
-    #  execute_command(data.chomp)
-    #
-    #  flush_buffer
-    #end
-
     def receive_object(payload)
       unless payload.cmd && @commands.include?(payload.cmd)
         @buffer << Napalm::Codes::BAD_SERVER_COMMAND and return
@@ -62,7 +57,7 @@ module Napalm
     def to_s
       "#{@ip}:#{@port}"
     end
-    
+
     private
 
     def client?
@@ -73,7 +68,7 @@ module Napalm
       @is_worker
     end
     #Universal Method
-    
+
     def flush_buffer
       if @buffer.empty?
         send_data("OK") if client?

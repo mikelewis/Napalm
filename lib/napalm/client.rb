@@ -23,7 +23,7 @@ module Napalm
     # client.do_asyn(:say_hi, "arg1", "arg2", 3)
     def do_async(*args)
       meth = args.shift
-      payload = Napalm::Payload.new(:do_work, Job.new(meth, args, {}))
+      payload = Napalm::Payload.new(:do_work, Job.new(meth, Marshal.dump(args), {}))
       data = Marshal.dump(payload)
       @sock ||= TCPSocket.open(@job_ip, @job_port)
       @sock.send([data.respond_to?(:bytesize) ? data.bytesize : data.size, data].pack('Na*'), 0)
