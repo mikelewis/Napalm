@@ -1,36 +1,58 @@
 require 'eventmachine'
 require 'socket'
 module Napalm
-  class Client
+  class Client < EventMachine::Connection
     include EM::P::ObjectProtocol
+
+    attr_reader :result
     def initialize(opts={})
-      @job_ip = opts[:ip] || "127.0.0.1"
-      @job_port = opts[:port] || 11211
+      super
+      @method = opts[:meth]
+      @args = opts[:args]
+      @sync = opts[:sync] || false
+      @result = nil
+      send_object(Napalm::Payload.new(:do_work, Job.new(@method, Marshal.dump(@args),:sync=>@sync )))
     end
 
-    #TODO
-    def recieve_object(obj)
-      p "Received Object"
+    def receive_object(obj)
+      @result = obj.data
+      EventMachine::stop_event_loop
     end
 
-    #TODO
-    def do(*args)
+    private
+
+    class << self
+      def init(opts={})
+        @job_ip = opts[:ip] || Napalm::Settings::JOB_SERVER_IP
+        @job_port = opts[:port] || Napalm::Settings::JOB_SERVER_PORT
+      end
+
+      def do(*args)
+        run_em(gen_connection(*grab_method_and_arguments(args), true))
+      end
+
+      def do_async(*args)
+        run_em(gen_connection(*grab_method_and_arguments(args)))
+      end
+
+      private
       
-    end
+      def run_em(connection)
+        srv = nil
+        EM.run {
+          srv = connection.call
+        }
+        srv.result if srv
+      end
 
-    #Example:
-    # client = Napalm::Client.new
-    # client.do_asyn(:say_hi, "arg1", "arg2", 3)
-    def do_async(*args)
-      meth = args.shift
-      payload = Napalm::Payload.new(:do_work, Job.new(meth, Marshal.dump(args), {}))
-      data = Marshal.dump(payload)
-      @sock ||= TCPSocket.open(@job_ip, @job_port)
-      @sock.send([data.respond_to?(:bytesize) ? data.bytesize : data.size, data].pack('Na*'), 0)
-      ret_data = @sock.recv(1024)
-      raise "No Available Workers for #{meth}" if ret_data == Napalm::Codes::NO_AVAILABLE_WORKERS
-      true if ret_data == Napalm::Codes::OK
+      def gen_connection(meth, arguments, sync=false)
+         lambda {EM.connect @job_ip || Napalm::Settings::JOB_SERVER_IP, @job_port || Napalm::Settings::JOB_SERVER_PORT, self, :meth => meth, :args => arguments, :sync=>sync }
+      end
 
-    end
+      def grab_method_and_arguments(args)
+        [args.shift, args]
+      end
+
+      end
     end
   end

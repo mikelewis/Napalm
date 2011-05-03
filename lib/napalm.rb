@@ -6,6 +6,7 @@ module Napalm
 end
 
 require 'napalm/codes'
+require 'napalm/settings'
 require 'napalm/utils'
 require 'napalm/persistance'
 require 'napalm/payload'

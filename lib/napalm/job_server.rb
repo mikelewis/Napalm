@@ -8,6 +8,7 @@ module Napalm
     @@worker_methods = {}
     @@clients = Set.new
     @@log = []
+    @@current_jobs = {}
 
     def post_init
       @buffer = ""
@@ -40,8 +41,8 @@ module Napalm
       unless payload.cmd && @commands.include?(payload.cmd)
         @buffer << Napalm::Codes::BAD_SERVER_COMMAND and return
       end
-      route = @commands[payload.cmd][:route].call(payload.data)
-      flush_buffer
+      result = @commands[payload.cmd][:route].call(payload.data)
+      flush_buffer unless result
     end
 
     def unbind
@@ -71,7 +72,7 @@ module Napalm
 
     def flush_buffer
       if @buffer.empty?
-        send_data("OK") if client?
+        send_object(Payload.new(:result, Napalm::Codes::OK)) if client?
       else
         send_data(@buffer)
         @buffer = ""
@@ -95,12 +96,18 @@ module Napalm
 
     def do_work(job)
       @is_client = true
+
       unless @@worker_methods.include?(job.meth) && !@@worker_methods[job.meth].empty?
         @buffer << Napalm::Codes::NO_AVAILABLE_WORKERS and return
       end
+      job.set_client!(@ip, @port)
+      @@current_jobs[job.id] = self
       worker = next_worker(job.meth)
       Napalm::Persistance.add(job)
       worker.send_object(job)
+
+      #if true, it will not flush the buffer because the client is waiting for the result
+      job.sync
     end
 
     #Client Method
@@ -113,6 +120,9 @@ module Napalm
 
     #Worker Method
     def done_working(job)
+      if !(client = @@current_jobs.delete(job.id)).nil? && job.sync
+        client.send_object(Payload.new(:result, job.result))
+      end
       Napalm::Persistance.remove(job)
     end
   end

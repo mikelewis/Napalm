@@ -23,10 +23,11 @@ module Napalm
       EM.defer do
         job = @@job_queue.pop
         untainted_job = job.clone
+        result = nil
         unless job.unmarshal_args! == Napalm::Codes::INVALID_WORKER_ARGUMENTS
           if self.class.worker_meths.include?(job.meth) && respond_to?(job.meth)
             begin
-              if job.args.empty?
+              result = if job.args.empty?
                 send(job.meth)
               else
                 send(job.meth, *job.args)
@@ -36,12 +37,11 @@ module Napalm
               #bad data
             end
           end
-
         else
           # handle invalid worker arguments
           # Maybe add to an error queue in Redis?
         end
-        completed_job(untainted_job)
+        completed_job(untainted_job.set_result!(result))
       end
     end
 
@@ -50,18 +50,17 @@ module Napalm
     end
 
     class << self
-      include Napalm::Utils
-      attr_reader :worker_meths, :my_ip, :my_port
+      attr_reader :worker_meths
       def worker_methods(*meths)
-        @worker_meths = meths
+        @worker_meths = [*(@worker_meths||=[]), *meths]
       end
 
       def do_work(opts={})
         raise "You need atleast one worker method" unless @worker_meths
         #job server settings
         opts.merge!({
-          :ip => "127.0.0.1",
-          :port => "11211"
+          :ip => Napalm::Settings::JOB_SERVER_IP,
+          :port => Napalm::Settings::JOB_SERVER_PORT
         })
         EM.run {
           srv = EM.connect opts[:ip], opts[:port], self

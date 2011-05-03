@@ -4,7 +4,7 @@ module Napalm
     def self.go
       EM.epoll
       EM.run do
-        EM.start_server "127.0.0.1", 11211, Napalm::JobServer
+        EM.start_server Napalm::Settings::JOB_SERVER_IP, Napalm::Settings::JOB_SERVER_PORT, Napalm::JobServer
       end
     end
   end

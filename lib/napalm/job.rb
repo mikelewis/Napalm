@@ -1,15 +1,16 @@
 module Napalm
   class Job
     include Napalm::Utils
-    attr_reader :meth, :args, :client
-    def initialize(meth, args, client)
+    attr_accessor :client, :result
+    attr_reader :meth, :args,:sync, :id
+    def initialize(meth, args, opts={})
       #@id = UUID.new.generate
       # Max File acccess limits per Operating System settings. =/
       @time = Time.now.to_i
       @id = "#{@time}#{rand_str(20)}"
       @meth = meth
       @args = args
-      @client = client
+      @sync = opts[:sync] || false
     end
 
     def unmarshal_args!
@@ -22,6 +23,16 @@ module Napalm
 
     def with_marshalled_args
       @args = Marshal.dump(@args)
+      self
+    end
+
+    def set_result!(val)
+      @result = val
+      self
+    end
+
+    def set_client!(ip, port)
+      @client = {:ip=>ip, :port=>port}
       self
     end
   end
