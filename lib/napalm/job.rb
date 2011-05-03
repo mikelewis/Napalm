@@ -1,7 +1,7 @@
 module Napalm
   class Job
     include Napalm::Utils
-    attr_accessor :meth, :args, :client
+    attr_reader :meth, :args, :client
     def initialize(meth, args, client)
       #@id = UUID.new.generate
       # Max File acccess limits per Operating System settings. =/

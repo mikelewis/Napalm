@@ -101,7 +101,7 @@ module Napalm
     def do_work(job)
       @is_client = true
       unless @@worker_methods.include?(job.meth) && !@@worker_methods[job.meth].empty?
-        @buffer << Napalm::Errors::NO_AVAILABLE_WORKERS and return
+        @buffer << Napalm::Codes::NO_AVAILABLE_WORKERS and return
       end
       worker = next_worker(job.meth)
       Napalm::Persistance.add(job)

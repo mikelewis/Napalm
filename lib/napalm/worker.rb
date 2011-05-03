@@ -22,7 +22,7 @@ module Napalm
     def do_job(job)
       EM.defer do
         job = @@job_queue.pop
-        if respond_to?(job.meth)
+        if self.class.worker_meths.include?(job.meth) && respond_to?(job.meth)
           begin
             if job.args.empty?
               send(job.meth)
