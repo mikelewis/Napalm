@@ -12,11 +12,17 @@ module Napalm
         "#{namespace}:jobs"
       end
       def add(job)
-        set.sadd(set_name, Marshal.dump(job))
+        set.sadd(set_name, job_to_persistant(job))
       end
 
       def remove(job)
-        set.srem(set_name, Marshal.dump(job))
+        set.srem(set_name, job_to_persistant(job))
+      end
+
+      private
+
+      def job_to_persistant(job)
+        Marshal.dump(job.quick_stats)
       end
     end
   end

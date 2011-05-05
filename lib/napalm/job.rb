@@ -13,6 +13,16 @@ module Napalm
       @sync = opts[:sync] || false
     end
 
+    def quick_stats
+      {
+        :meth => meth,
+        :args => args,
+        :sync => @sync,
+        :id => @id,
+        :time => @time
+      }
+    end
+
     def unmarshal_args!
       begin
         @args = Marshal.load(@args)
