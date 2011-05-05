@@ -123,7 +123,6 @@ module Napalm
       if !(client = @@current_jobs.delete(job.id)).nil? && job.sync
         client.send_object(Payload.new(:result, job.result))
       end
-      p Marshal.dump(job)
       Napalm::Persistance.remove(job)
     end
   end
