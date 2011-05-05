@@ -11,6 +11,4 @@ class Person
 end
 
 
-c = Napalm::Client.new
-
-c.do_async(:print_age_x_times, Person.new, 5)
+Napalm::Client.do_async(:print_age_x_times, Person.new, 5)

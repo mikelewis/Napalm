@@ -11,7 +11,7 @@ module Napalm
     @@current_jobs = {}
 
     def post_init
-      @buffer = ""
+      @buffer = nil
       @port, *ip_parts = get_peername[2,6].unpack "nC4"
       @ip = ip_parts.join('.')
       @is_client = false
@@ -71,11 +71,11 @@ module Napalm
     #Universal Method
 
     def flush_buffer
-      if @buffer.empty?
-        send_object(Payload.new(:result, Napalm::Codes::OK)) if client?
+      if @buffer
+        send_object(@buffer)
+        @buffer = nil
       else
-        send_data(@buffer)
-        @buffer = ""
+        send_object(Payload.new(:result, Napalm::Codes::OK)) if client?
       end
     end
 
@@ -96,9 +96,8 @@ module Napalm
 
     def do_work(job)
       @is_client = true
-
       unless @@worker_methods.include?(job.meth) && !@@worker_methods[job.meth].empty?
-        @buffer << Napalm::Codes::NO_AVAILABLE_WORKERS and return
+        @buffer = Payload.new(:result, Napalm::Codes::NO_AVAILABLE_WORKERS) and return
       end
       job.set_client!(@ip, @port)
       @@current_jobs[job.id] = self

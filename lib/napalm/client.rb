@@ -1,5 +1,4 @@
 require 'eventmachine'
-require 'socket'
 module Napalm
   class Client < EventMachine::Connection
     include EM::P::ObjectProtocol
@@ -10,16 +9,16 @@ module Napalm
       @method = opts[:meth]
       @args = opts[:args]
       @sync = opts[:sync] || false
+      @in_worker = opts[:in_worker] || false
       @result = nil
       send_object(Napalm::Payload.new(:do_work, Job.new(@method, Marshal.dump(@args),:sync=>@sync )))
+      self
     end
 
     def receive_object(obj)
       @result = obj.data
-      EventMachine::stop_event_loop
+      EventMachine::stop_event_loop unless @in_worker
     end
-
-    private
 
     class << self
       def init(opts={})
@@ -28,25 +27,41 @@ module Napalm
       end
 
       def do(*args)
-        run_em(gen_connection(*grab_method_and_arguments(args), true))
+        do_request(args, true)
       end
 
       def do_async(*args)
-        run_em(gen_connection(*grab_method_and_arguments(args)))
+        do_request(args, false)
       end
 
       private
-      
+
+      def do_request(args, sync=false)
+        if EventMachine.reactor_running?
+          connection = gen_connection(*grab_method_and_arguments(args), :in_worker=>true, :sync=>sync)
+          # we are in worker reactor
+          srv = connection.call
+        else
+          connection = gen_connection(*grab_method_and_arguments(args), :sync=>sync)
+          srv = run_em(connection)
+        end
+        until srv.result do end
+        srv.result
+
+      end
+
       def run_em(connection)
         srv = nil
         EM.run {
           srv = connection.call
         }
-        srv.result if srv
+        srv
       end
 
-      def gen_connection(meth, arguments, sync=false)
-         lambda {EM.connect @job_ip || Napalm::Settings::JOB_SERVER_IP, @job_port || Napalm::Settings::JOB_SERVER_PORT, self, :meth => meth, :args => arguments, :sync=>sync }
+      def gen_connection(meth, arguments, opts={})
+        sync = opts[:sync] || false
+        in_worker = opts[:in_worker] || false
+        lambda {EM.connect @job_ip || Napalm::Settings::JOB_SERVER_IP, @job_port || Napalm::Settings::JOB_SERVER_PORT, self, :meth => meth, :args => arguments, :sync=>sync, :in_worker=>in_worker }
       end
 
       def grab_method_and_arguments(args)

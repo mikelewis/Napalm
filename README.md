@@ -9,6 +9,7 @@ You can:
  * setup multiple workers to distribute the load.
  * pass arbitrary objects to workers.
  * have workers run on separate machines.
+ * have workers act as clients (think map-reduce)
  
  In progress:
 
