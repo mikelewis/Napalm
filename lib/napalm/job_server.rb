@@ -120,7 +120,7 @@ module Napalm
     #Worker Method
     def done_working(job)
       if !(client = @@current_jobs.delete(job.id)).nil? && job.sync
-        client.send_object(Payload.new(:result, job.result))
+        client.send_object(Payload.new(:result, job))
       end
       Napalm::Persistance.remove(job)
     end

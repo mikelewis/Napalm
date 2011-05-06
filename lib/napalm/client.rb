@@ -16,7 +16,11 @@ module Napalm
     end
 
     def receive_object(obj)
-      @result = obj.data
+      @result = if obj.is_a?(Napalm::Job)
+        obj.result
+      else
+        obj.data
+      end
       EventMachine::stop_event_loop unless @in_worker
     end
 
