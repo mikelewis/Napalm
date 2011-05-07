@@ -3,8 +3,9 @@ require File.join(File.dirname(f), '..', 'lib', 'napalm')
 require 'helper_objects'
 
 def launch_job_server
-  @job_pid = spawn("../bin/napalm")
+  job_pid = spawn("../bin/napalm")
   sleep 1
+  job_pid
 end
 
 def launch_worker(name)

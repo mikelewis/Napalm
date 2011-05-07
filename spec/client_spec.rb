@@ -3,7 +3,7 @@ require File.dirname(__FILE__) + '/spec_helper'
 describe Napalm::Client do
 
   before(:all) do
-    launch_job_server
+    @job_pid = launch_job_server
   end
 
   after(:all) do
@@ -37,6 +37,14 @@ describe Napalm::Client do
 
       it "should return a value with a sync call" do
         Napalm::Client.do(:add_me, 5, 100).should eq(105)
+      end
+
+      it "should not beable to call a worker method that does not exist for async" do
+        Napalm::Client.do_async(:some_function, [1,2]).should eq(Napalm::Codes::NO_AVAILABLE_WORKERS)
+      end
+
+      it "should not beable to call a worker method that does not exist for sync" do
+        Napalm::Client.do(:some_function, [1,2]).should eq(Napalm::Codes::NO_AVAILABLE_WORKERS)
       end
     end
 
