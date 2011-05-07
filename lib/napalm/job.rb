@@ -31,11 +31,6 @@ module Napalm
       end
     end
 
-    def with_marshalled_args
-      @args = Marshal.dump(@args)
-      self
-    end
-
     def set_result!(val)
       @result = val
       self
