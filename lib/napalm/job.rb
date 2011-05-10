@@ -2,7 +2,7 @@ module Napalm
   class Job
     include Napalm::Utils
     attr_accessor :client, :result
-    attr_reader :meth, :args,:sync, :id
+    attr_reader :meth, :args,:sync, :id, :has_callback
     def initialize(meth, args, opts={})
       #@id = UUID.new.generate
       # Max File acccess limits per Operating System settings. =/
@@ -11,7 +11,7 @@ module Napalm
       @meth = meth
       @args = args
       @sync = opts[:sync] || false
-      @callback = opts[:callback] || false
+      @has_callback = opts[:callback] || false
     end
 
     def quick_stats
@@ -21,7 +21,7 @@ module Napalm
         :sync => @sync,
         :id => @id,
         :time => @time,
-        :callback => @callback
+        :has_callback => @hash_callback
       }
     end
 

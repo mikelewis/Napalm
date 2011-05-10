@@ -10,7 +10,9 @@ You can:
  * pass arbitrary objects to workers.
  * have workers run on separate machines.
  * have workers act as clients (think map-reduce)
+ * async callbacks
  
  In progress:
 
  * saves jobs that aren't completed, and starts jobs up if job server crashes.
+ * allow worker to use async callbacks

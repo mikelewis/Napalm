@@ -10,6 +10,7 @@ module Napalm
     @@log = []
     @@current_jobs = {}
     @@callbacks = {}
+    @@pending_callbacks = {}
 
     def post_init
       @buffer = nil
@@ -93,7 +94,12 @@ module Napalm
     end
 
     def add_callback(job_id)
-      @@callbacks[job_id] = self
+      if  !(resulting_job = @@pending_callbacks.delete(job_id)).nil?
+        p "BOOM"
+        send_object(Payload.new(:result, resulting_job))
+      else
+        @@callbacks[job_id] = self
+      end
     end
 
     #Universal Method
@@ -131,7 +137,11 @@ module Napalm
       if !(client = @@current_jobs.delete(job.id)).nil?
         client.send_object(Payload.new(:result, job)) if job.sync
         if !(callback_client = @@callbacks.delete(job.id)).nil?
+          # callback connection was made before worker was completed
           callback_client.send_object(Payload.new(:result, job))
+        elsif job.has_callback
+          # callback connection hasn't been made yet, but it will be soon
+          @@pending_callbacks[job.id] = job
         end
       end
       Napalm::Persistance.remove(job)

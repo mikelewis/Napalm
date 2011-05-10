@@ -50,9 +50,10 @@ describe Napalm::Client do
       it "should be able to add a callback to async calls" do
         bob = "mike"
         r = Napalm::Client.do_async(:add_me, 20, 20) do |result|
+          p "GOT RESULT! #{result}"
           result.should eq(40)
         end
-        sleep 5 #emulate work
+        sleep 4 #emulate work
       end
 
       it "should be able receive initial response when adding a callback" do
