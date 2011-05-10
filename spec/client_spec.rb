@@ -46,6 +46,23 @@ describe Napalm::Client do
       it "should not beable to call a worker method that does not exist for sync" do
         Napalm::Client.do(:some_function, [1,2]).should eq(Napalm::Codes::NO_AVAILABLE_WORKERS)
       end
+
+      it "should be able to add a callback to async calls" do
+        bob = "mike"
+        r = Napalm::Client.do_async(:add_me, 20, 20) do |result|
+          result.should eq(40)
+        end
+        sleep 5 #emulate work
+      end
+
+      it "should be able receive initial response when adding a callback" do
+        call = Napalm::Client.do_async(:add_me, 20, 20) do |result|
+          p "GOT RESULT2! #{result}"
+        end
+        sleep 4
+        call.should eq(Napalm::Codes::OK)
+
+      end
     end
 
     context "Client interacting with passing objects" do

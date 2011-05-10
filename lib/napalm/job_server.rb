@@ -9,6 +9,7 @@ module Napalm
     @@clients = Set.new
     @@log = []
     @@current_jobs = {}
+    @@callbacks = {}
 
     def post_init
       @buffer = nil
@@ -33,6 +34,10 @@ module Napalm
           :done_working =>
         {
           :route => proc { |job| done_working(job) }
+        },
+          :add_callback =>
+        {
+          :route => proc { |job_id| add_callback(job_id)}   
         }
       }
     end
@@ -87,6 +92,10 @@ module Napalm
       @@log << "Added #{@ip}:#{@port} (#{methods.join(",")}) to worker list"
     end
 
+    def add_callback(job_id)
+      @@callbacks[job_id] = self
+    end
+
     #Universal Method
     def get_workers
       @buffer << @@worker_methods.inspect
@@ -119,8 +128,11 @@ module Napalm
 
     #Worker Method
     def done_working(job)
-      if !(client = @@current_jobs.delete(job.id)).nil? && job.sync
-        client.send_object(Payload.new(:result, job))
+      if !(client = @@current_jobs.delete(job.id)).nil?
+        client.send_object(Payload.new(:result, job)) if job.sync
+        if !(callback_client = @@callbacks.delete(job.id)).nil?
+          callback_client.send_object(Payload.new(:result, job))
+        end
       end
       Napalm::Persistance.remove(job)
     end

@@ -11,15 +11,17 @@ module Napalm
       @meth = meth
       @args = args
       @sync = opts[:sync] || false
+      @callback = opts[:callback] || false
     end
 
     def quick_stats
       {
-        :meth => meth,
-        :args => args,
+        :meth => @meth,
+        :args => @args,
         :sync => @sync,
         :id => @id,
-        :time => @time
+        :time => @time,
+        :callback => @callback
       }
     end
 
