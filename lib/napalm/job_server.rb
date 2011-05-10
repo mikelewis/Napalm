@@ -94,7 +94,8 @@ module Napalm
     end
 
     def add_callback(job_id)
-      if  !(resulting_job = @@pending_callbacks.delete(job_id)).nil?
+      if !(resulting_job = @@pending_callbacks.delete(job_id)).nil?
+        #result is already there for us
         send_object(Payload.new(:result, resulting_job))
       else
         @@callbacks[job_id] = self

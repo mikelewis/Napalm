@@ -54,21 +54,24 @@ module Napalm
 
       def do_callback(callback, job_id)
         # check if reactor is running for worker reactor
-          EM.run {
-            EM.connect(@job_ip || Napalm::Settings::JOB_SERVER_IP, @job_port || Napalm::Settings::JOB_SERVER_PORT, Napalm::Callback, callback, job_id)
-          }
-
+        connection = gen_connection(:callback=>callback, :job_id=>job_id, :handler=>Napalm::Callback)
+        if EM.reactor_running?
+          connection.call
+        else
+          run_em(connection)
+        end
       end
 
       def do_request(args, opts={})
         opts[:sync] ||= false
+        opts[:meth], opts[:args] = grab_method_and_arguments(args)
         if EventMachine.reactor_running?
           opts[:in_worker] = true
-          connection = gen_connection(*grab_method_and_arguments(args), opts)
+          connection = gen_connection(opts)
           # we are in worker reactor
           srv = connection.call
         else
-          connection = gen_connection(*grab_method_and_arguments(args), opts)
+          connection = gen_connection(opts)
           srv = run_em(connection)
         end
         until srv.result do end
@@ -84,11 +87,9 @@ module Napalm
         srv
       end
 
-      def gen_connection(meth, arguments, opts={})
-        sync = opts[:sync] || false
-        in_worker = opts[:in_worker] || false
-        callback = opts[:callback]
-        lambda {EM.connect @job_ip || Napalm::Settings::JOB_SERVER_IP, @job_port || Napalm::Settings::JOB_SERVER_PORT, self, :meth => meth, :args => arguments, :sync=>sync, :in_worker=>in_worker, :callback=>callback}
+      def gen_connection(opts={})
+        handler = opts[:handler] || self
+        lambda {EM.connect @job_ip || Napalm::Settings::JOB_SERVER_IP, @job_port || Napalm::Settings::JOB_SERVER_PORT, handler, opts}
       end
 
       def grab_method_and_arguments(args)
@@ -100,16 +101,18 @@ module Napalm
 
     class Callback < EventMachine::Connection
       include EM::P::ObjectProtocol
-      def initialize(callback, job_id)
+      def initialize(opts={})
         super
-        @callback = callback
+        raise("Need to add a callback to use Napalm::Callback") unless opts[:callback]
+        raise("Need to add a job_id to use Napalm::Callback") unless opts[:job_id]
+        @callback = opts[:callback]
 
-        send_object(Napalm::Payload.new(:add_callback, job_id))
+        send_object(Napalm::Payload.new(:add_callback, opts[:job_id]))
       end
 
       def receive_object(obj)
         @callback.call(obj.data.result)
-        EM.stop_event_loop
+        EM.stop_event_loop unless EM.connection_count > 0
       end
     end
   end

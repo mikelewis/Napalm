@@ -48,21 +48,46 @@ describe Napalm::Client do
       end
 
       it "should be able to add a callback to async calls" do
-        bob = "mike"
+        callback_result = nil
         r = Napalm::Client.do_async(:add_me, 20, 20) do |result|
-          p "GOT RESULT! #{result}"
-          result.should eq(40)
+          callback_result = result
         end
         sleep 4 #emulate work
+        callback_result.should eq(40)
       end
 
       it "should be able receive initial response when adding a callback" do
         call = Napalm::Client.do_async(:add_me, 20, 20) do |result|
-          p "GOT RESULT2! #{result}"
+          result
         end
         sleep 4
         call.should eq(Napalm::Codes::OK)
 
+      end
+
+      it "should be able to run other tasks while waiting for callback" do
+        responses = []
+        Napalm::Client.do_async(:long_running_1, "Mike", 5) do |result|
+          # should return mike
+          responses << result
+        end
+        Napalm::Client.do(:long_running_1, "Tim", 10).should eq("Tim")
+        responses.should eq(["Mike"])
+      end
+
+      it "should be able to run multiple async callbacks at once" do
+        responses = []
+        Napalm::Client.do_async(:long_running_1, "First", 5) do |result|
+          responses << result
+        end
+        Napalm::Client.do_async(:long_running_1, "Second", 5) do |result|
+          responses << result
+        end
+        Napalm::Client.do_async(:long_running_1, "Third", 5) do |result|
+          responses << result
+        end
+        sleep 6 #do work
+        responses.should eq(["First","Second", "Third"])
       end
     end
 

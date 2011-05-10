@@ -4,7 +4,7 @@ require File.join(File.dirname(f), '..', '..', 'lib', 'napalm')
 
 class MyWorker < Napalm::Worker
   worker_methods :this, :that, :lr, :loop_lists, :add_me
-  worker_methods :create_odds
+  worker_methods :create_odds, :long_running_1
   def this
     p "Im doing this!"
   end
@@ -34,6 +34,12 @@ class MyWorker < Napalm::Worker
   def create_odds(upto)
     (1..upto).select{|x| !(x%2).zero? }
   end
+
+  def long_running_1(echo, time)
+    sleep time
+    echo
+  end
+
 end
 
 MyWorker.do_work
