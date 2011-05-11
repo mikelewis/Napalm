@@ -21,5 +21,7 @@ Gem::Specification.new do |s|
 
   s.add_runtime_dependency('redis', '>= 2.2.0')
   s.add_runtime_dependency('eventmachine', '>= 0.12.10')
+  s.add_runtime_dependency('activesupport')
+  s.add_runtime_dependency('msgpack')
   
 end

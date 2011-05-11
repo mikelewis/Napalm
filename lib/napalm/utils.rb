@@ -1,8 +1,25 @@
+require 'active_support'
+require 'eventmachine'
 module Napalm
   module Utils
     def rand_str(len)
-      chars = ('a'..'z').to_a+('A'..'Z').to_a
-      (1..len).map{ chars[rand(chars.length)]  }.join;
+      ActiveSupport::SecureRandom.hex(len)
     end
+    def dump_data(x)
+      Marshal.dump(x)
+    end
+
+    def load_data(x)
+      Marshal.load(x)
+    end
+
+    module_function :dump_data, :load_data
+
+
+    module ObjectProtocol
+    include EM::P::ObjectProtocol
+      #override seralizer here
+    end
+
   end
 end

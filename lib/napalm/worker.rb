@@ -4,12 +4,16 @@ require 'thread'
 
 module Napalm
   class Worker < EventMachine::Connection
-    include EM::P::ObjectProtocol
+    include Napalm::Utils::ObjectProtocol
     @@job_queue = ::Queue.new
 
     def initialize
       super
       send_object(Napalm::Payload.new(:add_worker, self.class.worker_meths))
+    end
+
+    def unbind
+      # should reconnect every x seconds, chances are job server went down
     end
 
     def receive_object(obj)

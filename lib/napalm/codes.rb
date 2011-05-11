@@ -1,8 +1,14 @@
 module Napalm
   class Codes
-    NO_AVAILABLE_WORKERS = "1"
-    OK = "2"
-    BAD_SERVER_COMMAND = "3"
-    INVALID_WORKER_ARGUMENTS = "4"
+    NO_AVAILABLE_WORKERS = :NAPALM_NO_AVAILABLE_WORKERS
+    OK = :NAPALM_OK
+    BAD_SERVER_COMMAND = :NAPALM_BAD_SERVER_COMMAND
+    INVALID_WORKER_ARGUMENTS = :NAPALM_INVALID_WORKER_ARGUMENTS
+
+    @@error_codes = [NO_AVAILABLE_WORKERS, BAD_SERVER_COMMAND, INVALID_WORKER_ARGUMENTS]
+
+    def self.error?(code)
+      @@error_codes.include?(code)
+    end
   end
 end

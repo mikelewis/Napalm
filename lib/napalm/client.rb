@@ -1,7 +1,7 @@
 require 'eventmachine'
 module Napalm
   class Client < EventMachine::Connection
-    include EM::P::ObjectProtocol
+    include Napalm::Utils::ObjectProtocol
 
     attr_reader :result, :job
     def initialize(opts={})
@@ -11,7 +11,7 @@ module Napalm
       @sync = opts[:sync] || false
       @in_worker = opts[:in_worker] || false
       @result = nil
-      @job = Job.new(@method, Marshal.dump(@args), :sync =>@sync, :callback => !!opts[:callback])
+      @job = Job.new(@method, Napalm::Utils.dump_data(@args), :sync =>@sync, :callback => !!opts[:callback])
 
       send_object(Napalm::Payload.new(:do_work, @job))
       self
@@ -36,18 +36,12 @@ module Napalm
         result
       end
 
-      def do_async(*args, &blk)
-        opts = {}
-        if block_given?
-          opts[:callback] = blk
-        end
-        result, ending_connection = do_request(args, opts)
-
-        Thread.new do
-          do_callback(blk, ending_connection.job.id)
-        end if block_given? && result == Napalm::Codes::OK
-
-        result
+      def start(&blk)
+        raise "You need to pass in a block" unless block_given?
+        EM.run {
+          conn = EM.connect @job_ip || Napalm::Settings::JOB_SERVER_IP, @job_port || Napalm::Settings::JOB_SERVER_PORT, Napalm::Bulkcall
+          conn.run_block(blk)
+        }
       end
 
       private
@@ -97,22 +91,43 @@ module Napalm
       end
 
       end
+
     end
 
-    class Callback < EventMachine::Connection
-      include EM::P::ObjectProtocol
-      def initialize(opts={})
+    class Bulkcall < EventMachine::Connection
+      include Napalm::Utils::ObjectProtocol
+      def initialize
         super
-        raise("Need to add a callback to use Napalm::Callback") unless opts[:callback]
-        raise("Need to add a job_id to use Napalm::Callback") unless opts[:job_id]
-        @callback = opts[:callback]
+        @jobs = Set.new
+        @callbacks = {}
+        @pending_jobs = {}
+      end
 
-        send_object(Napalm::Payload.new(:add_callback, opts[:job_id]))
+      def run_block(block)
+        block.call(self)
+      end
+
+      def do_async(meth, *args, &blk)
+        job = Job.new(meth, Napalm::Utils.dump_data(args), :sync =>false, :callback => block_given?, :bulk_job=>true)
+        @pending_jobs[job.id] = nil
+        @callbacks[job.id] = blk if block_given?
+        send_object(Napalm::Payload.new(:do_work, job))
       end
 
       def receive_object(obj)
-        @callback.call(obj.data.result)
-        EM.stop_event_loop unless EM.connection_count > 0
+        if obj.data.is_a?(Napalm::Job)
+          job = obj.data
+          call_callback(job)
+          EM.stop if @callbacks.empty?
+        end
+      end
+
+      private
+
+      def call_callback(job)
+        if callback = @callbacks.delete(job.id)
+          callback.call(job.result)
+        end
       end
     end
   end

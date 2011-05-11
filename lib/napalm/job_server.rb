@@ -3,14 +3,11 @@ require 'set'
 
 module Napalm
   module JobServer
-    include EM::P::ObjectProtocol
+    include Napalm::Utils::ObjectProtocol
     @@workers = Set.new
     @@worker_methods = {}
-    @@clients = Set.new
     @@log = []
     @@current_jobs = {}
-    @@callbacks = {}
-    @@pending_callbacks = {}
 
     def post_init
       @buffer = nil
@@ -35,10 +32,6 @@ module Napalm
           :done_working =>
         {
           :route => proc { |job| done_working(job) }
-        },
-          :add_callback =>
-        {
-          :route => proc { |job_id| add_callback(job_id)}   
         }
       }
     end
@@ -58,7 +51,7 @@ module Napalm
           workers.delete(self)
         end
       end
-      @@clients.delete(self)
+      @@current_jobs.delete_if{|k,v| v[:client] == self} if client?
     end
 
     def to_s
@@ -93,15 +86,6 @@ module Napalm
       @@log << "Added #{@ip}:#{@port} (#{methods.join(",")}) to worker list"
     end
 
-    def add_callback(job_id)
-      if !(resulting_job = @@pending_callbacks.delete(job_id)).nil?
-        #result is already there for us
-        send_object(Payload.new(:result, resulting_job))
-      else
-        @@callbacks[job_id] = self
-      end
-    end
-
     #Universal Method
     def get_workers
       @buffer << @@worker_methods.inspect
@@ -112,12 +96,12 @@ module Napalm
     def do_work(job)
       @is_client = true
       unless @@worker_methods.include?(job.meth) && !@@worker_methods[job.meth].empty?
-        @buffer = Payload.new(:result, Napalm::Codes::NO_AVAILABLE_WORKERS) and return
+        @buffer = Payload.new(:result, job.set_error!(Napalm::Codes::NO_AVAILABLE_WORKERS)) and return
       end
       job.set_client!(@ip, @port)
-      @@current_jobs[job.id] = self
       worker = next_worker(job.meth)
-      Napalm::Persistance.add(job)
+      @@current_jobs[job.id] = {:client => self, :worker => worker}
+      #Napalm::Persistance.add(job)
       worker.send_object(job)
 
       #if true, it will not flush the buffer because the client is waiting for the result
@@ -134,17 +118,10 @@ module Napalm
 
     #Worker Method
     def done_working(job)
-      if !(client = @@current_jobs.delete(job.id)).nil?
-        client.send_object(Payload.new(:result, job)) if job.sync
-        if !(callback_client = @@callbacks.delete(job.id)).nil?
-          # callback connection was made before worker was completed
-          callback_client.send_object(Payload.new(:result, job))
-        elsif job.has_callback
-          # callback connection hasn't been made yet, but it will be soon
-          @@pending_callbacks[job.id] = job
-        end
+      if !(current_job = @@current_jobs.delete(job.id)).nil?
+        current_job[:client].send_object(Payload.new(:result, job))
       end
-      Napalm::Persistance.remove(job)
+      #Napalm::Persistance.remove(job)
     end
   end
 end

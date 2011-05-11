@@ -2,9 +2,12 @@
 f = File.symlink?(__FILE__) ? File.readlink(__FILE__) : __FILE__
 require File.join(File.dirname(f), '..', '..', 'lib', 'napalm')
 
+require "fileutils"
+
 class MyWorker < Napalm::Worker
   worker_methods :this, :that, :lr, :loop_lists, :add_me
   worker_methods :create_odds, :long_running_1
+  worker_methods :save_file
   def this
     p "Im doing this!"
   end
@@ -27,8 +30,7 @@ class MyWorker < Napalm::Worker
   end
 
   def add_me(x, y)
-    sleep 2 #long time adding :)
-    x+y
+    x + y
   end
 
   def create_odds(upto)
@@ -40,6 +42,11 @@ class MyWorker < Napalm::Worker
     echo
   end
 
+  def save_file(name)
+    FileUtils.touch(name)
+  end
 end
 
+
 MyWorker.do_work
+

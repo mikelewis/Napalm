@@ -1,8 +1,8 @@
 module Napalm
   class Job
     include Napalm::Utils
-    attr_accessor :client, :result
-    attr_reader :meth, :args,:sync, :id, :has_callback
+    attr_accessor :client, :result, :error
+    attr_reader :meth, :args,:sync, :id
     def initialize(meth, args, opts={})
       #@id = UUID.new.generate
       # Max File acccess limits per Operating System settings. =/
@@ -11,7 +11,7 @@ module Napalm
       @meth = meth
       @args = args
       @sync = opts[:sync] || false
-      @has_callback = opts[:callback] || false
+      @error = false
     end
 
     def quick_stats
@@ -20,14 +20,13 @@ module Napalm
         :args => @args,
         :sync => @sync,
         :id => @id,
-        :time => @time,
-        :has_callback => @hash_callback
+        :time => @time
       }
     end
 
     def unmarshal_args!
       begin
-        @args = Marshal.load(@args)
+        @args = Napalm::Utils.load_data(@args)
       rescue ArgumentError => e
         return Napalm::Codes::INVALID_WORKER_ARGUMENTS
       end
@@ -40,6 +39,12 @@ module Napalm
 
     def set_client!(ip, port)
       @client = {:ip=>ip, :port=>port}
+      self
+    end
+
+    def set_error!(error)
+      @error = true
+      @result = error
       self
     end
   end

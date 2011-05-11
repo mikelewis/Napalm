@@ -22,7 +22,7 @@ module Napalm
       private
 
       def job_to_persistant(job)
-        Marshal.dump(job.quick_stats)
+        Napalm::Utils.dump_data(job.quick_stats)
       end
     end
   end
