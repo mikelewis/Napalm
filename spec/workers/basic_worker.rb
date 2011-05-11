@@ -27,7 +27,6 @@ class MyWorker < Napalm::Worker
   end
 
   def add_me(x, y)
-    sleep 2 #long time adding :)
     x+y
   end
 
