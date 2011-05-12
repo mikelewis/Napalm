@@ -135,14 +135,15 @@ module Napalm
     #Worker Method
     def done_working(job)
       if !(client = @@current_jobs.delete(job.id)).nil?
-        client.send_object(Payload.new(:result, job)) if job.sync
-        if !(callback_client = @@callbacks.delete(job.id)).nil?
+        #client.send_object(Payload.new(:result, job)) if job.sync
+        client.send_object(Payload.new(:result, job))
+        #if !(callback_client = @@callbacks.delete(job.id)).nil?
           # callback connection was made before worker was completed
-          callback_client.send_object(Payload.new(:result, job))
-        elsif job.has_callback
+       #   callback_client.send_object(Payload.new(:result, job))
+       # elsif job.has_callback
           # callback connection hasn't been made yet, but it will be soon
-          @@pending_callbacks[job.id] = job
-        end
+       #   @@pending_callbacks[job.id] = job
+       # end
       end
       Napalm::Persistance.remove(job)
     end

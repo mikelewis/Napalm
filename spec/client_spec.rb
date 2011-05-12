@@ -22,6 +22,7 @@ describe Napalm::Client do
       Napalm::Client.respond_to?(:do_async).should eq(true)
     end
 
+=begin
     context "Client interacting with basic worker" do
       before(:all) do
         @worker1_pid = launch_worker("basic_worker")
@@ -105,4 +106,32 @@ describe Napalm::Client do
       end
     end
 
+=end
+      context "Bulk Calls" do
+        before(:all) do
+          #@workers = 16.times.map{ launch_worker("basic_worker")}
+          @worker1_pid = launch_worker("basic_worker")
+        end
+
+        after(:all) do
+          #@workers.each{|x| Process.kill("HUP", x)}
+          Process.kill("HUP", @worker1_pid)
+        end
+
+        it "should beable to run bulk calls with async calls" do
+          results = []
+          Napalm::Client.start do |client|
+            3.times do |n|
+              client.do_async(:add_me, 1, n) {|result| results << result}
+            end
+          end
+          results.should eq([1,2,3])
+        end
+
+        #it "should be able to run bulk calls with sync calls" do
+        #  Napalm::Client.start do |client|
+        #    client.do(:add_me, 1, 3).should eq(4)
+        #  end
+       # end
+      end
   end

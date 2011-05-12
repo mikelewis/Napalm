@@ -50,6 +50,17 @@ module Napalm
         result
       end
 
+
+      def start(&blk)
+        raise "You need to pass in a block" unless block_given?
+        EM.run {
+          conn = EM.connect @job_ip || Napalm::Settings::JOB_SERVER_IP, @job_port || Napalm::Settings::JOB_SERVER_PORT, Napalm::Bulkcall
+          conn.run_block(blk)
+        }
+      end
+
+
+
       private
 
       def do_callback(callback, job_id)
@@ -96,7 +107,9 @@ module Napalm
         [args.shift, args]
       end
 
+
       end
+
     end
 
     class Callback < EventMachine::Connection
@@ -113,6 +126,39 @@ module Napalm
       def receive_object(obj)
         @callback.call(obj.data.result)
         EM.stop_event_loop unless EM.connection_count > 0
+      end
+    end
+
+    class Bulkcall < EventMachine::Connection
+      include EM::P::ObjectProtocol
+      def initialize
+        super
+        @sync_jobs = {}
+        @jobs = Set.new
+        @callbacks = {}
+      end
+
+      def run_block(block)
+        block.call(self)
+        #EM.stop if @callbacks.empty?
+      end
+
+
+
+      def do_async(meth, *args, &blk)
+        job = Job.new(meth, Marshal.dump(args), :sync =>false, :callback => block_given?)
+        @callbacks[job.id] = blk if block_given?
+        send_object(Napalm::Payload.new(:do_work, job))
+      end
+
+      def receive_object(obj)
+        if obj.data.is_a?(Napalm::Job)
+          job = obj.data
+          if callback = @callbacks.delete(job.id)
+            callback.call(job.result)
+          end
+          EM.stop if @callbacks.empty? && @sync_jobs.empty?
+        end
       end
     end
   end

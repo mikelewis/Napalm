@@ -27,7 +27,7 @@ class MyWorker < Napalm::Worker
   end
 
   def add_me(x, y)
-    x+y
+    x + y
   end
 
   def create_odds(upto)
