@@ -12,6 +12,11 @@ You can:
  * have workers act as clients (think map-reduce)
  * async callbacks
 
+In Progress:
+
+ * Restart workers when they disconnect from Job Server
+ * Have ability to specify which server and port to listen on(for both job and worker)
+
 
 ###Run Job Server
     napalm
