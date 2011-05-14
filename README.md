@@ -5,14 +5,47 @@ Distributed Message Queueing System as a weekend project to learn eventmachine. 
 You can:
 
  * make synchronous and asynchronous calls.
- * have workers can compute multiple tasks.
+ * have workers compute multiple tasks.
  * setup multiple workers to distribute the load.
  * pass arbitrary objects to workers.
  * have workers run on separate machines.
  * have workers act as clients (think map-reduce)
  * async callbacks
- 
- In progress:
 
- * saves jobs that aren't completed, and starts jobs up if job server crashes.
- * allow worker to use async callbacks
+
+###Run Job Server
+    napalm
+
+###Create Worker
+    #worker.rb
+    require 'napalm'
+    
+    class MyWorker < Napalm::Worker
+      worker_methods :add_me
+
+      def add_me(x, y)
+        x+y
+      end
+
+      def some_private_function
+        "hi"
+      end
+    end
+
+    MyWorker.do_work
+
+###Run Worker
+     ruby worker.rb
+
+###Create Client
+    require 'napalm'
+    
+    #async calls
+    Napalm::Client.start do |client|
+      client.do_async(:add_me, 3, 5){|result| puts result}
+      client.do_async(:add_me, 100, 1){|result| puts result}
+    end
+
+    #sync calls
+    result = Napalm::Client.do(:add_me, 3, 5)
+
